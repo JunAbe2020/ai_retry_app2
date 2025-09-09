@@ -18,6 +18,9 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('settings/password', 'settings.password')->name('settings.password');
     Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
 
+    // ミス一覧画面
+    Volt::route('retries/index', 'retries.index')->name('retries.index');
+
     // ミス詳細画面
     Volt::route('retries/{mistake}', 'retries.show')->name('retries.show');
 });
