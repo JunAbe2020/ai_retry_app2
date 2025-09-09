@@ -25,10 +25,10 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('retries/create', 'retries.create')->name('retries.create');
 
     // ミス詳細画面
-    Volt::route('retries/{mistake}', 'retries.show')->name('retries.show');
+    Volt::route('retries/{retry}', 'retries.show')->name('retries.show');
 
     // ミス更新画面
-    Volt::route('retries/{mistake}/edit', 'retries.edit')->name('retries.edit');
+    Volt::route('retries/{retry}/edit', 'retries.edit')->name('retries.edit');
 });
 
 require __DIR__ . '/auth.php';
