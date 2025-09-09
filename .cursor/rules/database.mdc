@@ -1,0 +1,96 @@
+---
+alwaysApply: true
+---
+
+# データベースルール
+
+## テーブル定義
+
+### mistakes テーブル
+
+#### カラム定義
+
+| カラム名 | 型 | NULL | 制約 | 説明 |
+|----------|-----|------|------|------|
+| id | bigint unsigned | NO | PK | ミスID |
+| user_id | bigint unsigned | NO | FK | ユーザーID |
+| title | string | NO | - | タイトル |
+| happened_at | datetime | NO | - | 発生日時 |
+| situation | text | NO | - | 状況 |
+| cause | text | NO | - | 原因 |
+| my_solution | text | NO | - | 解決策 |
+| ai_notes | longtext | YES | - | AI改善案 |
+| supplement | text | YES | - | 補足 |
+| re_ai_notes | longtext | YES | - | AI解決策 |
+| reminder_date | datetime | YES | - | リマインド日時 |
+| is_reminded | boolean | NO | default(false) | リマインド済みフラグ |
+| created_at | timestamp | YES | - | 作成日時 |
+| updated_at | timestamp | YES | - | 更新日時 |
+
+#### リレーション
+
+| 関連テーブル | 関係 | 削除時の動作 |
+|------------|------|------------|
+| users | 1対多 | CASCADE |
+| tags | belongsToMany (多:多) | 中間テーブルのレコードを削除 (cascade) |
+
+### tags テーブル
+
+#### カラム定義
+
+| カラム名 | 型 | NULL | 制約 | 説明 |
+|----------|-----|------|------|------|
+| id | bigint unsigned | NO | PK | タグID |
+| name | string | NO | unique | タグ名 |
+| created_at | timestamp | YES | - | 作成日時 |
+| updated_at | timestamp | YES | - | 更新日時 |
+
+#### リレーション
+
+#### tags テーブル
+| 関連テーブル | 関係 | 削除時の動作 |
+|------------|------|------------|
+| mistakes | belongsToMany (多:多) | 中間テーブルのレコードを削除 (cascade) |
+
+### mistake_tags テーブル
+
+#### カラム定義
+
+| カラム名 | 型 | NULL | 制約 | 説明 |
+|----------|-----|------|------|------|
+| mistake_id | bigint unsigned | NO | FK | ミスID |
+| tag_id | bigint unsigned | NO | FK | タグID |
+| created_at | timestamp | YES | - | 作成日時 |
+| updated_at | timestamp | YES | - | 更新日時 |
+
+#### リレーション定義
+
+| 関連テーブル | 関係 | 削除時の動作 |
+|------------|------|------------|
+| mistakes | - | 親レコード（mistake）削除時に削除 (cascade) |
+| tags | - | 親レコード（tag）削除時に削除 (cascade) |
+
+## シーディング
+
+### 基本ルール
+1. 開発環境用の初期データは必ず用意すること
+2. テストデータは現実的なデータを使用すること
+3. パスワードは全てハッシュ化すること
+4. リレーション関係を考慮した順序でシーディングを行うこと
+
+### シーディング順序
+1. `UsersSeeder`
+2. `TagsSeeder`
+3. `MistakesSeeder`
+4. `MistakeTagsSeeder`
+
+### テストデータ量の目安
+- Users: 10件
+- Tags: 20件
+- Mistakes: 50件
+- MistakeTags: 100件（1つのミスに対して1-3個のタグ）
+
+### Factory設定
+- 各モデルにFactoryを実装すること
+- Fakerを使用して現実的なデータを生成すること
+- リレーション関係を考慮したFactoryを実装すること
