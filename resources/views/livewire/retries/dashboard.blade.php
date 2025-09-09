@@ -1,11 +1,22 @@
 <?php
 
-use function Livewire\Volt\{mount};
+use function Livewire\Volt\{mount, state, action};
 use App\Models\Mistake;
 use Carbon\Carbon;
 
+// 状態の定義
+state([
+    'weeklyRetries' => [],
+    'weeklyMistakes' => [],
+]);
+
 // コンポーネントマウント時にデータを取得
 mount(function () {
+    $this->loadWeeklyData();
+});
+
+// 週次データを読み込むメソッド
+$loadWeeklyData = function () {
     $startOfWeek = Carbon::now()->startOfWeek();
     $endOfWeek = Carbon::now()->endOfWeek();
 
@@ -23,6 +34,23 @@ mount(function () {
         ->with('tags')
         ->orderBy('happened_at', 'desc')
         ->get();
+};
+
+// 完了マークを付けるメソッド
+$markAsCompleted = action(function ($mistakeId) {
+    $mistake = Mistake::where('id', $mistakeId)
+        ->where('user_id', auth()->id())
+        ->first();
+
+    if ($mistake) {
+        $mistake->update(['is_reminded' => true]);
+
+        // データを再読み込み
+        $this->loadWeeklyData();
+
+        // 成功メッセージを表示
+        session()->flash('message', 'RETRYを完了としてマークしました。');
+    }
 });
 
 ?>
