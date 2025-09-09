@@ -21,6 +21,9 @@ Route::middleware(['auth'])->group(function () {
     // ミス一覧画面
     Volt::route('retries/index', 'retries.index')->name('retries.index');
 
+    // ミス作成画面
+    Volt::route('retries/create', 'retries.create')->name('retries.create');
+
     // ミス詳細画面
     Volt::route('retries/{mistake}', 'retries.show')->name('retries.show');
 });
