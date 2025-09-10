@@ -30,6 +30,15 @@ alwaysApply: true
  - コンポーネント: retries.index
  - 表示する内容:
     - ミスの一覧表示
+      -検索: input
+      -フィルター: button
+         -modalで以下を表示
+            -期間
+            -タグ
+               -タグ検索: input
+               -タグ追加: button
+            -検索: button
+            -閉じる: button
       -ミスの内容
       -ミスのタイトル
       -タグ
