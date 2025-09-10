@@ -12,6 +12,22 @@ alwaysApply: true
 
 ### ミス詳細画面
 
+### ダッシュボード画面
+-ルーティング: retries/dashbord
+-コンポーネント: retries.dashbord
+-表示する内容:
+   -アプリのタイトル「RETRY」
+   -アプリのキャッチコピー「It’s okay to mess up!!」
+   -今週のRETRYリスト
+      -ミスのタイトル
+      -日時
+      -AI解決案
+      -完了: チェックボックス
+   -今週のミスリスト
+      -ミスのタイトル
+      -日時
+      -AI解決案
+
  - ルーティング: retries/{retry}
  - コンポーネント: retries.show
  - 表示する内容 :
@@ -131,20 +147,6 @@ alwaysApply: true
  -更新 → ミス更新後にミス詳細画面
  -キャンセル → ミス詳細画面
 
-### ダッシュボード画面
--ルーティング: retries/dashbord
--コンポーネント: retries.dashbord
--表示する内容:
-   -アプリのタイトル「RETRY」
-   -アプリのキャッチコピー「It’s okay to mess up!!」
-   -今週のRETRYリスト
-      -ミスのタイトル
-      -日時
-      -AI解決案
-      -完了: チェックボックス
-   -今週のミスリスト
-      -ミスのタイトル
-      -日時
-      -AI解決案
+
 
 
