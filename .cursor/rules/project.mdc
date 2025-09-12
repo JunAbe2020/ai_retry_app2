@@ -147,6 +147,29 @@ alwaysApply: true
  -更新 → ミス更新後にミス詳細画面
  -キャンセル → ミス詳細画面
 
+## API連携
+Hugging Face経由でモデル:meta-llama/Llama-3.3-70B-Instructを利用し、AI改善案とAI改善案を生成する。
+ただし、ボタンが2つあり、Brash up ボタンを押した場合はAI改善策を生成しmistakesテーブルのai_notesに保存。Re:Brash upボタンを押した場合はAI解決策を生成し、re_ai_notesに保存。
 
+利用するデータ
+-mistakesテーブル
+   -Brash up ボタンを押した場合。
+      -タイトル
+      -日時
+      -状況
+      -原因
+      -解決法
+
+   -Re:Brash up ボタンを押した場合。
+      -タイトル
+      -日時
+      -状況
+      -原因
+      -解決法
+      -AI改善案
+      -補足
+
+-AI改善案とAI解決法の生成条件
+ 端的に箇条書きで記載すること。
 
 

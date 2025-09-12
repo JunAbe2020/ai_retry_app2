@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'hf' => [
+    'token'    => env('HF_TOKEN'),
+    'base_url' => env('HF_BASE_URL', 'https://router.huggingface.co/v1'),
+    'model'    => env('HF_MODEL', 'meta-llama/Llama-3.1-70B-Instruct:groq'),
+    'timeout'  => (int) env('HF_TIMEOUT', 30),
+    ],
+
 ];

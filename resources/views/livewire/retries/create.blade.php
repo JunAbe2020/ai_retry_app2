@@ -3,6 +3,7 @@
 use function Livewire\Volt\{state, rules, computed};
 use App\Models\Tag;
 use Carbon\Carbon;
+use App\Services\AiNoteService;
 
 state([
     'title' => '',
@@ -50,12 +51,34 @@ $removeTag = function ($tagId) {
     $this->selected_tags = array_filter($this->selected_tags, fn($id) => $id !== $tagId);
 };
 
-$brashUp = function () {
-    // TODO: AI改善案の生成処理を実装
+$brashUp = function (AiNoteService $ai) {
+        // 必須入力チェック（rules に従う）
+    $this->validate();
+
+    // AIに渡す値を state から抽出 & 日時を標準化
+    $payload = $this->only(['title','happened_at','situation','cause','my_solution']);
+    if (!empty($payload['happened_at'])) {
+        $payload['happened_at'] = Carbon::parse($payload['happened_at'])->toDateTimeString();
+    }
+
+    // 生成して state に書き戻し
+    $this->ai_notes = $ai->generateImprovement($payload);
 };
 
-$reBrashUp = function () {
-    // TODO: AI解決策の生成処理を実装
+$reBrashUp = function (AiNoteService $ai) {
+        // 必須入力チェック
+    $this->validate();
+
+    // 改善案や補足も含めて渡す & 日時を標準化
+    $payload = $this->only([
+        'title','happened_at','situation','cause','my_solution','ai_notes','supplement',
+    ]);
+    if (!empty($payload['happened_at'])) {
+        $payload['happened_at'] = Carbon::parse($payload['happened_at'])->toDateTimeString();
+    }
+
+    // 生成して state に書き戻し
+    $this->re_ai_notes = $ai->generateSolution($payload);
 };
 
 $save = function () {
