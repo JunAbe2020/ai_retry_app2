@@ -148,6 +148,9 @@ alwaysApply: true
  -キャンセル → ミス詳細画面
 
 ## API連携
+
+### Hugging Face
+
 Hugging Face経由でモデル:meta-llama/Llama-3.3-70B-Instructを利用し、AI改善案とAI改善案を生成する。
 ただし、ボタンが2つあり、Brash up ボタンを押した場合はAI改善策を生成しmistakesテーブルのai_notesに保存。Re:Brash upボタンを押した場合はAI解決策を生成し、re_ai_notesに保存。
 
@@ -172,4 +175,8 @@ Hugging Face経由でモデル:meta-llama/Llama-3.3-70B-Instructを利用し、A
 -AI改善案とAI解決法の生成条件
  端的に箇条書きで記載すること。
 
+ ### Google Calendar API
+
+Google Calendar APIのサービスクラスを利用し、保存されたデータをGoogle Calendarへ登録する。
+ミス作成画面
 

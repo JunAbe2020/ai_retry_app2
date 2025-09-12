@@ -26,15 +26,18 @@ state([
 mount(function ($retry) {
     $mistakeModel = Mistake::findOrFail($retry);
     $this->mistake = $mistakeModel;
-    $this->title = $mistakeModel->title;
-    $this->happened_at = $mistakeModel->happened_at;
-    $this->situation = $mistakeModel->situation;
-    $this->cause = $mistakeModel->cause;
-    $this->my_solution = $mistakeModel->my_solution;
-    $this->ai_notes = $mistakeModel->ai_notes;
-    $this->supplement = $mistakeModel->supplement;
-    $this->re_ai_notes = $mistakeModel->re_ai_notes;
-    $this->reminder_date = $mistakeModel->reminder_date;
+
+    $this->title        = (string) $mistakeModel->title;
+    // ★ datetime-local 表示用にフォーマット
+    $this->happened_at  = optional($mistakeModel->happened_at)->format('Y-m-d\TH:i');
+    $this->situation    = (string) $mistakeModel->situation;
+    $this->cause        = (string) $mistakeModel->cause;
+    $this->my_solution  = (string) $mistakeModel->my_solution;
+    $this->ai_notes     = (string) ($mistakeModel->ai_notes ?? '');
+    $this->supplement   = (string) ($mistakeModel->supplement ?? '');
+    $this->re_ai_notes  = (string) ($mistakeModel->re_ai_notes ?? '');
+    $this->reminder_date = optional($mistakeModel->reminder_date)->format('Y-m-d\TH:i');
+
     $this->tags = $mistakeModel->tags->pluck('name')->toArray();
     $this->availableTags = Tag::pluck('name')->toArray();
 });
@@ -47,19 +50,24 @@ rules([
     'my_solution' => 'required|max:2000',
     'supplement' => 'nullable|max:2000',
     'newTag' => 'max:10',
+    'reminder_date' => 'nullable|date',
 ]);
 
 $updateMistake = function () {
     $this->validate();
 
+    // ★ 文字列（"Y-m-d\TH:i"）→ Carbon へ変換
+    $happenedAt = filled($this->happened_at) ? Carbon::parse((string) $this->happened_at) : null;
+    $reminder   = filled($this->reminder_date) ? Carbon::parse((string) $this->reminder_date) : null;
+
     $this->mistake->update([
-        'title' => $this->title,
-        'happened_at' => $this->happened_at,
-        'situation' => $this->situation,
-        'cause' => $this->cause,
-        'my_solution' => $this->my_solution,
-        'supplement' => $this->supplement,
-        'reminder_date' => $this->reminder_date,
+        'title'         => (string) $this->title,
+        'happened_at'   => optional($happenedAt)->toDateTimeString(),
+        'situation'     => (string) $this->situation,
+        'cause'         => (string) $this->cause,
+        'my_solution'   => (string) $this->my_solution,
+        'supplement'    => (string) $this->supplement,
+        'reminder_date' => optional($reminder)->toDateTimeString(),
     ]);
 
     // タグの同期
@@ -93,12 +101,16 @@ $removeTag = function ($tag) {
 $requestAiAnalysis = function (AiNoteService $svc) {
     $this->isProcessing = true;
     try {
+        $happenedAtForApi = filled($this->happened_at)
+            ? Carbon::parse((string) $this->happened_at)->toDateTimeString()
+            : '';
+
         $payload = [
-            'title'       => $this->title,
-            'happened_at' => optional($this->happened_at)->toDateTimeString() ?: (string) $this->happened_at,
-            'situation'   => $this->situation,
-            'cause'       => $this->cause,
-            'my_solution' => $this->my_solution,
+            'title'       => (string) $this->title,
+            'happened_at' => $happenedAtForApi,
+            'situation'   => (string) $this->situation,
+            'cause'       => (string) $this->cause,
+            'my_solution' => (string) $this->my_solution,
         ];
 
         $text = $svc->generateImprovement($payload);
@@ -121,14 +133,18 @@ $requestAiAnalysis = function (AiNoteService $svc) {
 $requestReAiAnalysis = function (AiNoteService $svc) {
     $this->isProcessing = true;
     try {
+        $happenedAtForApi = filled($this->happened_at)
+            ? Carbon::parse((string) $this->happened_at)->toDateTimeString()
+            : '';
+
         $payload = [
-            'title'       => $this->title,
-            'happened_at' => optional($this->happened_at)->toDateTimeString() ?: (string) $this->happened_at,
-            'situation'   => $this->situation,
-            'cause'       => $this->cause,
-            'my_solution' => $this->my_solution,
-            'ai_notes'    => $this->ai_notes,
-            'supplement'  => $this->supplement,
+            'title'       => (string) $this->title,
+            'happened_at' => $happenedAtForApi,
+            'situation'   => (string) $this->situation,
+            'cause'       => (string) $this->cause,
+            'my_solution' => (string) $this->my_solution,
+            'ai_notes'    => (string) ($this->ai_notes ?? ''),
+            'supplement'  => (string) ($this->supplement ?? ''),
         ];
 
         $text = $svc->generateSolution($payload);
@@ -160,9 +176,7 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
                     <label for="title" class="block text-sm font-medium text-gray-700">タイトル</label>
                     <input type="text" wire:model="title" id="title"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    @error('title')
-                        <span class="text-red-500 text-sm">{{ $message }}</span>
-                    @enderror
+                    @error('title') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                 </div>
 
                 <!-- 発生日時 -->
@@ -170,9 +184,7 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
                     <label for="happened_at" class="block text-sm font-medium text-gray-700">発生日時</label>
                     <input type="datetime-local" wire:model="happened_at" id="happened_at"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    @error('happened_at')
-                        <span class="text-red-500 text-sm">{{ $message }}</span>
-                    @enderror
+                    @error('happened_at') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                 </div>
 
                 <!-- 状況 -->
@@ -180,9 +192,7 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
                     <label for="situation" class="block text-sm font-medium text-gray-700">状況</label>
                     <textarea wire:model="situation" id="situation" rows="3"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-                    @error('situation')
-                        <span class="text-red-500 text-sm">{{ $message }}</span>
-                    @enderror
+                    @error('situation') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                 </div>
 
                 <!-- 原因 -->
@@ -190,9 +200,7 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
                     <label for="cause" class="block text-sm font-medium text-gray-700">原因</label>
                     <textarea wire:model="cause" id="cause" rows="3"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-                    @error('cause')
-                        <span class="text-red-500 text-sm">{{ $message }}</span>
-                    @enderror
+                    @error('cause') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                 </div>
 
                 <!-- 解決策 -->
@@ -200,9 +208,7 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
                     <label for="my_solution" class="block text-sm font-medium text-gray-700">解決策</label>
                     <textarea wire:model="my_solution" id="my_solution" rows="3"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-                    @error('my_solution')
-                        <span class="text-red-500 text-sm">{{ $message }}</span>
-                    @enderror
+                    @error('my_solution') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                 </div>
 
                 <!-- AI解決策（= 改善案の表示領域として使用） -->
@@ -224,9 +230,7 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
                     <label for="supplement" class="block text-sm font-medium text-gray-700">補足</label>
                     <textarea wire:model="supplement" id="supplement" rows="3"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-                    @error('supplement')
-                        <span class="text-red-500 text-sm">{{ $message }}</span>
-                    @enderror
+                    @error('supplement') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                 </div>
 
                 <!-- Re:AI解決策 -->
@@ -247,21 +251,15 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">タグ</label>
 
-                    <!-- 現在のタグ -->
                     <div class="flex flex-wrap gap-2 mb-4">
                         @foreach ($tags as $tag)
-                            <span
-                                class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
                                 {{ $tag }}
-                                <button type="button" wire:click="removeTag('{{ $tag }}')"
-                                    class="ml-2 text-blue-600 hover:text-blue-800">
-                                    ×
-                                </button>
+                                <button type="button" wire:click="removeTag('{{ $tag }}')" class="ml-2 text-blue-600 hover:text-blue-800">×</button>
                             </span>
                         @endforeach
                     </div>
 
-                    <!-- 新規タグ作成 -->
                     <div class="flex gap-2 mb-4">
                         <input type="text" wire:model="newTag" placeholder="新しいタグ"
                             class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
@@ -270,11 +268,8 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
                             作成
                         </button>
                     </div>
-                    @error('newTag')
-                        <span class="text-red-500 text-sm">{{ $message }}</span>
-                    @enderror
+                    @error('newTag') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
 
-                    <!-- 既存タグ追加 -->
                     <div class="flex flex-wrap gap-2">
                         @foreach ($availableTags as $tag)
                             @if (!in_array($tag, $this->tags))
