@@ -6,21 +6,28 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Throwable;
 
 final class AiNoteService
 {
+    private string $baseUrl;
+    private string $token;
+    private string $model;
+    private int $timeoutSec;
+
     public function __construct(
-        private readonly string $baseUrl = '',
-        private readonly string $token   = '',
-        private readonly string $model   = '',
-        private readonly int $timeoutSec = 30,
+        ?string $baseUrl = null,
+        ?string $token = null,
+        ?string $model = null,
+        ?int $timeoutSec = null,
     ) {
-        $svc = config('services.hf');
-        
-        $this->baseUrl = $this->baseUrl ?: config('huggingface.base_url');
-        $this->token   = $this->token   ?: config('huggingface.token');
-        $this->model   = $this->model   ?: config('huggingface.model');
-        $this->timeoutSec = $this->timeoutSec ?: (int) config('huggingface.timeout', 30);
+        // config/services.php の 'hf' セクションから取得
+        $cfg = config('services.hf', []);
+
+        $this->baseUrl    = $baseUrl    ?? ($cfg['base_url'] ?? 'https://router.huggingface.co/v1');
+        $this->token      = $token      ?? ($cfg['token']    ?? '');
+        $this->model      = $model      ?? ($cfg['model']    ?? 'meta-llama/Llama-3.3-70B-Instruct:groq');
+        $this->timeoutSec = $timeoutSec ?? (int)($cfg['timeout'] ?? 30);
     }
 
     /**
@@ -30,8 +37,11 @@ final class AiNoteService
     public function generateImprovement(array $payload): string
     {
         $system = <<<SYS
-あなたは「ミス改善コーチ」です。出力は必ず日本語の箇条書き配列。
-各項目は60文字以内・最大8個。冗長表現や重複は避け、実行可能な改善案に限定。
+あなたは「ミス改善コーチ」です。出力は必ず日本語の箇条書き。
+・各項目は60文字以内
+・最大8個
+・冗長や重複は不可
+・実行可能な改善案のみ
 SYS;
 
         $user = $this->formatUserPrompt($payload, includeAiNotes:false);
@@ -47,8 +57,10 @@ SYS;
     public function generateSolution(array $payload): string
     {
         $system = <<<SYS
-あなたは「再発防止アーキテクト」です。出力は必ず日本語の箇条書き配列。
-各項目は60文字以内・最大10個。手順・チェック項目・受付基準など具体策に限定。
+あなたは「再発防止アーキテクト」です。出力は必ず日本語の箇条書き。
+・各項目は60文字以内
+・最大10個
+・手順/担当/期限/検証/再発防止を具体的に
 SYS;
 
         $user = $this->formatUserPrompt($payload, includeAiNotes:true);
@@ -57,61 +69,62 @@ SYS;
         return $this->toBulletedText($bullets);
     }
 
-    /** OpenAI互換 /chat/completions を呼ぶ */
+    /**
+     * Hugging Face Router (OpenAI 互換) /v1/chat/completions を呼び出す
+     * 可能ならJSON配列を期待し、ダメでも行単位にフォールバック
+     *
+     * @return array<string>
+     */
     private function callRouter(string $system, string $user): array
     {
-        $response = Http::withToken($this->token)
-            ->baseUrl($this->baseUrl)                // e.g. https://router.huggingface.co/groq/v1
-            ->timeout($this->timeoutSec)
-            ->acceptJson()
-            ->asJson()
-            ->post('chat/completions', [
-                'model' => $this->model,             // e.g. meta-llama/Llama-3.3-70B-Instruct
-                'messages' => [
-                    ['role' => 'system', 'content' => $system],
-                    ['role' => 'user',   'content' => $user],
-                ],
-                // 箇条書き配列を JSON Schema で強制
-                'response_format' => [
-                    'type' => 'json_schema',
-                    'json_schema' => [
-                        'name' => 'BulletPoints',
-                        'schema' => [
-                            'type' => 'object',
-                            'additionalProperties' => false,
-                            'required' => ['bullets'],
-                            'properties' => [
-                                'bullets' => [
-                                    'type' => 'array',
-                                    'minItems' => 1,
-                                    'items' => ['type' => 'string', 'maxLength' => 120],
-                                ],
-                            ],
-                        ],
-                        'strict' => true,
+        try {
+            $response = Http::withToken($this->token)
+                ->baseUrl($this->baseUrl) // 例: https://router.huggingface.co/v1
+                ->timeout($this->timeoutSec)
+                ->acceptJson()
+                ->asJson()
+                ->post('chat/completions', [
+                    'model' => $this->model, // 例: meta-llama/Llama-3.3-70B-Instruct:groq
+                    'messages' => [
+                        ['role' => 'system', 'content' => $system],
+                        ['role' => 'user',   'content' => $user],
                     ],
-                ],
-                'temperature' => 0.3,
-                'max_tokens'  => 800,
-            ])
-            ->throw();
+                    'temperature' => 0.3,
+                    'max_tokens'  => 800,
+                    // モデルには「箇条書き」を強く指示しているので、
+                    // まずは通常テキストとして受け取り、行分割で安全に処理する。
+                ])
+                ->throw();
 
-        // OpenAI互換の content には JSON 文字列が返る
-        $content = data_get($response->json(), 'choices.0.message.content', '');
-        $json = json_decode($content, true);
+            $content = (string) data_get($response->json(), 'choices.0.message.content', '');
 
-        // 想定外フォーマットでも壊れないようフォールバック
-        if (!is_array($json) || !isset($json['bullets']) || !is_array($json['bullets'])) {
-            // 1行ずつに割る
-            $lines = preg_split('/\r\n|\r|\n/u', trim((string)$content));
-            $lines = array_values(array_filter(array_map('trim', $lines)));
+            // JSON配列（["...", "..."]）で返った場合にも対応
+            $json = json_decode($content, true);
+            if (is_array($json) && array_is_list($json)) {
+                $lines = array_map('trim', $json);
+                $lines = array_values(array_filter($lines, fn($s) => $s !== ''));
+                return $lines ?: ['生成結果が空でした。'];
+            }
+
+            // 通常テキストの場合は行単位で分割
+            $lines = preg_split('/\r\n|\r|\n/u', trim($content) ?: '');
+            $lines = array_map(function ($line) {
+                // 先頭の記号（-, ・, * , 数字.) を取り除いて整形
+                $s = Str::of($line)->trim();
+                $s = $s->replaceMatches('/^\s*([-*・]|\d+\.)\s*/u', '');
+                return (string) $s;
+            }, $lines ?: []);
+            $lines = array_values(array_filter($lines, fn($s) => $s !== ''));
+
             return $lines ?: ['生成に失敗しました。もう一度お試しください。'];
+        } catch (Throwable $e) {
+            // ログに詳細。ユーザーには安全な文言のみ返す。
+            report($e);
+            return ['外部API呼び出しに失敗しました。後でもう一度お試しください。'];
         }
-
-        return array_values(array_filter(array_map('trim', $json['bullets'])));
     }
 
-    /** 端的な日本語の箇条書きに整形して返す */
+    /** 箇条書きのプレーンテキストへ整形（先頭に「・」を付与） */
     private function toBulletedText(array $bullets): string
     {
         $bullets = array_map(
@@ -124,20 +137,22 @@ SYS;
     private function formatUserPrompt(array $p, bool $includeAiNotes): string
     {
         $lines = [
-            "タイトル: "     . ($p['title']        ?? ''),
-            "日時: "         . ($p['happened_at']  ?? ''),
-            "状況: "         . ($p['situation']    ?? ''),
-            "原因: "         . ($p['cause']        ?? ''),
-            "既存の解決法: " . ($p['my_solution']  ?? ''),
+            'タイトル: '     . ($p['title']        ?? ''),
+            '日時: '         . ($p['happened_at']  ?? ''),
+            '状況: '         . ($p['situation']    ?? ''),
+            '原因: '         . ($p['cause']        ?? ''),
+            '既存の解決法: ' . ($p['my_solution']  ?? ''),
         ];
+
         if ($includeAiNotes) {
-            $lines[] = "AI改善案: " . ($p['ai_notes']   ?? '');
-            $lines[] = "補足: "     . ($p['supplement'] ?? '');
-            $lines[] = "要件: 端的に箇条書きで『実施手順・担当・期限・検証方法・再発防止策』を優先。";
+            $lines[] = 'AI改善案: ' . ($p['ai_notes']   ?? '');
+            $lines[] = '補足: '     . ($p['supplement'] ?? '');
+            $lines[] = '要件: 端的な箇条書きで「実施手順・担当・期限・検証方法・再発防止策」を優先。';
         } else {
-            $lines[] = "要件: 端的に箇条書きで『原因特定の深掘り・プロセス改善・チェック項目』を優先。";
+            $lines[] = '要件: 端的な箇条書きで「原因深掘り・プロセス改善・チェック項目」を優先。';
         }
-        $lines[] = "出力は日本語。記号以外の装飾や前置きは禁止。";
+
+        $lines[] = '出力は日本語のみ。前置きやまとめ文は禁止。';
         return implode("\n", $lines);
     }
 }

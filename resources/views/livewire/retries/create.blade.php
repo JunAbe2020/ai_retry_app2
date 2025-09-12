@@ -2,8 +2,8 @@
 
 use function Livewire\Volt\{state, rules, computed};
 use App\Models\Tag;
-use Carbon\Carbon;
 use App\Services\AiNoteService;
+use Carbon\Carbon;
 
 state([
     'title' => '',
@@ -51,34 +51,42 @@ $removeTag = function ($tagId) {
     $this->selected_tags = array_filter($this->selected_tags, fn($id) => $id !== $tagId);
 };
 
-$brashUp = function (AiNoteService $ai) {
-        // 必須入力チェック（rules に従う）
-    $this->validate();
-
-    // AIに渡す値を state から抽出 & 日時を標準化
-    $payload = $this->only(['title','happened_at','situation','cause','my_solution']);
-    if (!empty($payload['happened_at'])) {
-        $payload['happened_at'] = Carbon::parse($payload['happened_at'])->toDateTimeString();
+/** Brash up: 改善案を生成→画面に反映（保存は「保存」ボタン時） */
+$brashUp = function (AiNoteService $svc) {
+    try {
+        $payload = [
+            'title'       => $this->title,
+            'happened_at' => (string) $this->happened_at,
+            'situation'   => $this->situation,
+            'cause'       => $this->cause,
+            'my_solution' => $this->my_solution,
+        ];
+        $this->ai_notes = $svc->generateImprovement($payload);
+        session()->flash('message', 'AI改善案を生成しました。保存するとDBに反映されます。');
+    } catch (\Throwable $e) {
+        report($e);
+        session()->flash('message', 'AI改善案の生成に失敗しました。入力内容を見直すか後で再度お試しください。');
     }
-
-    // 生成して state に書き戻し
-    $this->ai_notes = $ai->generateImprovement($payload);
 };
 
-$reBrashUp = function (AiNoteService $ai) {
-        // 必須入力チェック
-    $this->validate();
-
-    // 改善案や補足も含めて渡す & 日時を標準化
-    $payload = $this->only([
-        'title','happened_at','situation','cause','my_solution','ai_notes','supplement',
-    ]);
-    if (!empty($payload['happened_at'])) {
-        $payload['happened_at'] = Carbon::parse($payload['happened_at'])->toDateTimeString();
+/** Re:Brash up: 解決策を生成→画面に反映（保存は「保存」ボタン時） */
+$reBrashUp = function (AiNoteService $svc) {
+    try {
+        $payload = [
+            'title'       => $this->title,
+            'happened_at' => (string) $this->happened_at,
+            'situation'   => $this->situation,
+            'cause'       => $this->cause,
+            'my_solution' => $this->my_solution,
+            'ai_notes'    => $this->ai_notes,
+            'supplement'  => $this->supplement,
+        ];
+        $this->re_ai_notes = $svc->generateSolution($payload);
+        session()->flash('message', 'AI解決策を生成しました。保存するとDBに反映されます。');
+    } catch (\Throwable $e) {
+        report($e);
+        session()->flash('message', 'AI解決策の生成に失敗しました。入力内容を見直すか後で再度お試しください。');
     }
-
-    // 生成して state に書き戻し
-    $this->re_ai_notes = $ai->generateSolution($payload);
 };
 
 $save = function () {
@@ -260,7 +268,7 @@ $save = function () {
 
                     <div class="mt-4">
                         <div class="flex flex-wrap gap-2">
-                            @foreach ($this->tags as $tag)
+                            @foreach ($tags as $tag)
                                 <button type="button" wire:click="addTag({{ $tag->id }})"
                                     class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {{ in_array($tag->id, $selected_tags) ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800' }} hover:bg-indigo-200">
                                     {{ $tag->name }}

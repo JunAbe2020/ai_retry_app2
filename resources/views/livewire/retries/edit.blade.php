@@ -3,6 +3,7 @@
 use function Livewire\Volt\{state, rules, computed, mount};
 use App\Models\Mistake;
 use App\Models\Tag;
+use App\Services\AiNoteService;
 use Carbon\Carbon;
 
 state([
@@ -88,22 +89,62 @@ $removeTag = function ($tag) {
     $this->tags = array_values(array_diff($this->tags, [$tag]));
 };
 
-$requestAiAnalysis = function () {
+/** Brash up: 改善案を生成→ai_notesに保存 */
+$requestAiAnalysis = function (AiNoteService $svc) {
     $this->isProcessing = true;
+    try {
+        $payload = [
+            'title'       => $this->title,
+            'happened_at' => optional($this->happened_at)->toDateTimeString() ?: (string) $this->happened_at,
+            'situation'   => $this->situation,
+            'cause'       => $this->cause,
+            'my_solution' => $this->my_solution,
+        ];
 
-    // TODO: AI分析のロジックを実装
-    // OpenAI APIを使用して解決策を生成
+        $text = $svc->generateImprovement($payload);
 
-    $this->isProcessing = false;
+        // 画面反映 & 保存
+        $this->ai_notes = $text;
+        $this->mistake->update(['ai_notes' => $text]);
+        $this->mistake->refresh();
+
+        session()->flash('message', 'AI改善案を保存しました。');
+    } catch (\Throwable $e) {
+        report($e);
+        session()->flash('message', 'AI改善案の生成に失敗しました。しばらくして再実行してください。');
+    } finally {
+        $this->isProcessing = false;
+    }
 };
 
-$requestReAiAnalysis = function () {
+/** Re:Brash up: 解決策を生成→re_ai_notesに保存 */
+$requestReAiAnalysis = function (AiNoteService $svc) {
     $this->isProcessing = true;
+    try {
+        $payload = [
+            'title'       => $this->title,
+            'happened_at' => optional($this->happened_at)->toDateTimeString() ?: (string) $this->happened_at,
+            'situation'   => $this->situation,
+            'cause'       => $this->cause,
+            'my_solution' => $this->my_solution,
+            'ai_notes'    => $this->ai_notes,
+            'supplement'  => $this->supplement,
+        ];
 
-    // TODO: 再AI分析のロジックを実装
-    // OpenAI APIを使用して改善された解決策を生成
+        $text = $svc->generateSolution($payload);
 
-    $this->isProcessing = false;
+        // 画面反映 & 保存
+        $this->re_ai_notes = $text;
+        $this->mistake->update(['re_ai_notes' => $text]);
+        $this->mistake->refresh();
+
+        session()->flash('message', 'AI解決策を保存しました。');
+    } catch (\Throwable $e) {
+        report($e);
+        session()->flash('message', 'AI解決策の生成に失敗しました。しばらくして再実行してください。');
+    } finally {
+        $this->isProcessing = false;
+    }
 };
 
 ?>
@@ -164,7 +205,7 @@ $requestReAiAnalysis = function () {
                     @enderror
                 </div>
 
-                <!-- AI解決策 -->
+                <!-- AI解決策（= 改善案の表示領域として使用） -->
                 <div>
                     <div class="flex justify-between items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">AI解決策</label>
@@ -174,7 +215,7 @@ $requestReAiAnalysis = function () {
                         </button>
                     </div>
                     <div class="mt-1 bg-gray-50 rounded-md p-4">
-                        <p class="text-gray-700">{{ $ai_notes }}</p>
+                        <p class="text-gray-700 whitespace-pre-wrap">{{ $ai_notes }}</p>
                     </div>
                 </div>
 
@@ -198,7 +239,7 @@ $requestReAiAnalysis = function () {
                         </button>
                     </div>
                     <div class="mt-1 bg-gray-50 rounded-md p-4">
-                        <p class="text-gray-700">{{ $re_ai_notes }}</p>
+                        <p class="text-gray-700 whitespace-pre-wrap">{{ $re_ai_notes }}</p>
                     </div>
                 </div>
 
@@ -236,7 +277,7 @@ $requestReAiAnalysis = function () {
                     <!-- 既存タグ追加 -->
                     <div class="flex flex-wrap gap-2">
                         @foreach ($availableTags as $tag)
-                            @if (!in_array($tag, $tags))
+                            @if (!in_array($tag, $this->tags))
                                 <button type="button" wire:click="addTag('{{ $tag }}')"
                                     class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 hover:bg-gray-200">
                                     {{ $tag }}
