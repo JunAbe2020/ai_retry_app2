@@ -14,12 +14,12 @@ Route::view('dashboard', 'dashboard')
 Route::middleware(['auth'])->group(function () {
     Route::redirect('settings', 'settings/profile');
 
-    Volt::route('settings/profile', 'settings.profile')->name('settings.profile');
+    Volt::route('setting/', 'settings.profile')->name('settings.profile');
     Volt::route('settings/password', 'settings.password')->name('settings.password');
     Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
 
     // ダッシュボード画面
-    Volt::route('retries/dashboard', 'retries.dashboard')->name('retries.dashboard');
+    Volt::route('/', 'retries.dashboard')->name('retries.dashboard');
 
     // ミス一覧画面
     Volt::route('retries/index', 'retries.index')->name('retries.index');
