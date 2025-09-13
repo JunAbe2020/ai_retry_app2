@@ -1,9 +1,10 @@
 <?php
 
-use function Livewire\Volt\{state, rules, computed, mount};
+use function Livewire\Volt\{state, rules, computed, mount, action};
 use App\Models\Mistake;
 use App\Models\Tag;
 use App\Services\AiNoteService;
+use App\Services\GoogleCalendarService; // 追加
 use Carbon\Carbon;
 
 state([
@@ -27,15 +28,14 @@ mount(function ($retry) {
     $mistakeModel = Mistake::findOrFail($retry);
     $this->mistake = $mistakeModel;
 
-    $this->title        = (string) $mistakeModel->title;
-    // ★ datetime-local 表示用にフォーマット
-    $this->happened_at  = optional($mistakeModel->happened_at)->format('Y-m-d\TH:i');
-    $this->situation    = (string) $mistakeModel->situation;
-    $this->cause        = (string) $mistakeModel->cause;
-    $this->my_solution  = (string) $mistakeModel->my_solution;
-    $this->ai_notes     = (string) ($mistakeModel->ai_notes ?? '');
-    $this->supplement   = (string) ($mistakeModel->supplement ?? '');
-    $this->re_ai_notes  = (string) ($mistakeModel->re_ai_notes ?? '');
+    $this->title         = (string) $mistakeModel->title;
+    $this->happened_at   = optional($mistakeModel->happened_at)->format('Y-m-d\TH:i');
+    $this->situation     = (string) $mistakeModel->situation;
+    $this->cause         = (string) $mistakeModel->cause;
+    $this->my_solution   = (string) $mistakeModel->my_solution;
+    $this->ai_notes      = (string) ($mistakeModel->ai_notes ?? '');
+    $this->supplement    = (string) ($mistakeModel->supplement ?? '');
+    $this->re_ai_notes   = (string) ($mistakeModel->re_ai_notes ?? '');
     $this->reminder_date = optional($mistakeModel->reminder_date)->format('Y-m-d\TH:i');
 
     $this->tags = $mistakeModel->tags->pluck('name')->toArray();
@@ -53,10 +53,9 @@ rules([
     'reminder_date' => 'nullable|date',
 ]);
 
-$updateMistake = function () {
+$updateMistake = action(function () {
     $this->validate();
 
-    // ★ 文字列（"Y-m-d\TH:i"）→ Carbon へ変換
     $happenedAt = filled($this->happened_at) ? Carbon::parse((string) $this->happened_at) : null;
     $reminder   = filled($this->reminder_date) ? Carbon::parse((string) $this->reminder_date) : null;
 
@@ -70,13 +69,35 @@ $updateMistake = function () {
         'reminder_date' => optional($reminder)->toDateTimeString(),
     ]);
 
-    // タグの同期
+    // タグ同期
     $tagIds = Tag::whereIn('name', $this->tags)->pluck('id');
     $this->mistake->tags()->sync($tagIds);
 
+    // ★ カレンダーUpsert / 削除
+    try {
+        $gc = app(GoogleCalendarService::class);
+
+        if ($this->mistake->reminder_date) {
+            $eventId = $gc->upsertEventForMistake($this->mistake);
+            if ($this->mistake->gcal_event_id !== $eventId) {
+                $this->mistake->gcal_event_id = $eventId;
+                $this->mistake->save();
+            }
+        } else {
+            if ($this->mistake->gcal_event_id) {
+                $gc->deleteEventById($this->mistake->gcal_event_id);
+                $this->mistake->gcal_event_id = null;
+                $this->mistake->save();
+            }
+        }
+    } catch (\Throwable $e) {
+        report($e);
+        session()->flash('message', 'Googleカレンダー更新に失敗しました：'.$e->getMessage());
+    }
+
     session()->flash('message', 'ミスの記録を更新しました。');
     $this->redirect(route('retries.show', ['retry' => $this->mistake]));
-};
+});
 
 $createTag = function () {
     $this->validate(['newTag' => 'required|max:10|unique:tags,name']);
@@ -115,7 +136,6 @@ $requestAiAnalysis = function (AiNoteService $svc) {
 
         $text = $svc->generateImprovement($payload);
 
-        // 画面反映 & 保存
         $this->ai_notes = $text;
         $this->mistake->update(['ai_notes' => $text]);
         $this->mistake->refresh();
@@ -149,7 +169,6 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
 
         $text = $svc->generateSolution($payload);
 
-        // 画面反映 & 保存
         $this->re_ai_notes = $text;
         $this->mistake->update(['re_ai_notes' => $text]);
         $this->mistake->refresh();
@@ -164,6 +183,8 @@ $requestReAiAnalysis = function (AiNoteService $svc) {
 };
 
 ?>
+
+<!-- 以降のHTMLはそのまま（省略） -->
 
 <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
     <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">

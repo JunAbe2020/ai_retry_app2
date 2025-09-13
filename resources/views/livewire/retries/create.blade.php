@@ -1,8 +1,9 @@
 <?php
 
-use function Livewire\Volt\{state, rules, computed};
+use function Livewire\Volt\{state, rules, computed, action};
 use App\Models\Tag;
 use App\Services\AiNoteService;
+use App\Services\GoogleCalendarService; // 追加
 use Carbon\Carbon;
 
 state([
@@ -88,10 +89,10 @@ $reBrashUp = function (AiNoteService $svc) {
     }
 };
 
-$save = function () {
+$save = action(function () {
     $this->validate();
 
-    // datetime-local -> Carbon（例: "2025-09-10T16:50" を安全に変換）
+    // datetime-local -> Carbon
     $happenedAt = filled($this->happened_at) ? Carbon::parse((string) $this->happened_at) : null;
     $reminder   = filled($this->reminder_date) ? Carbon::parse((string) $this->reminder_date) : null;
 
@@ -100,24 +101,39 @@ $save = function () {
         ->mistakes()
         ->create([
             'title'         => (string) $this->title,
-            'happened_at'   => optional($happenedAt)->toDateTimeString(),   // "Y-m-d H:i:s"
+            'happened_at'   => optional($happenedAt)->toDateTimeString(),
             'situation'     => (string) $this->situation,
             'cause'         => (string) $this->cause,
             'my_solution'   => (string) $this->my_solution,
             'ai_notes'      => (string) $this->ai_notes,
             'supplement'    => (string) $this->supplement,
             're_ai_notes'   => (string) $this->re_ai_notes,
-            'reminder_date' => optional($reminder)->toDateTimeString(),     // null or "Y-m-d H:i:s"
+            'reminder_date' => optional($reminder)->toDateTimeString(),
         ]);
 
     if (!empty($this->selected_tags)) {
         $mistake->tags()->attach($this->selected_tags);
     }
 
+    // ★ カレンダー登録（reminder_date がある場合のみ）
+    if ($mistake->reminder_date) {
+        try {
+            $gc = app(GoogleCalendarService::class);
+            $eventId = $gc->createEventForMistake($mistake);
+            $mistake->gcal_event_id = $eventId;
+            $mistake->save();
+        } catch (\Throwable $e) {
+            report($e);
+            session()->flash('message', 'Googleカレンダー登録に失敗しました：'.$e->getMessage());
+        }
+    }
+
     return redirect()->route('retries.show', $mistake);
-};
+});
 
 ?>
+
+<!-- 以降のHTMLはそのまま（省略） -->
 
 <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
     <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">

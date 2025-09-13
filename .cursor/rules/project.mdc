@@ -175,8 +175,37 @@ Hugging Face経由でモデル:meta-llama/Llama-3.3-70B-Instructを利用し、A
 -AI改善案とAI解決法の生成条件
  端的に箇条書きで記載すること。
 
- ### Google Calendar API
+### Google Calendar
 
-Google Calendar APIのサービスクラスを利用し、保存されたデータをGoogle Calendarへ登録する。
-ミス作成画面
+Google Calendar APIのサービスクラスを利用し、Google Calendarにデータの追加、更新、削除を行う。
+
+-条件
+   -Google CalendaのEventのタスクに追加
+      -ミス作成画面
+         -保存ボタンを押す →　Google Calendarへデータの登録
+      -ミス更新画面
+         -保存ボタンを押す →　Google Calendarへ登録済みのデータの更新
+      -ミス一覧画面
+         -削除ボタンを押す →　Google Caledarへ登録済みのデータを削除
+
+-利用するデータ
+   -mistakesテーブル
+      -タイトル
+      -AI改善策
+      -リマインド日時
+
+-Google Calendarへ登録、更新、削除するデータ。
+
+-条件
+   -予定ではなく、タスクに追加する
+
+-mistakesテーブルのデータの保存先
+   -タイトル → タイトルと日時を追加
+   -AI改善策 → 説明を追加
+   -リマインド日時 → 時間を追加
+
+
+
+
+
 
