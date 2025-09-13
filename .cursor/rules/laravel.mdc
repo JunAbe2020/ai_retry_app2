@@ -59,4 +59,8 @@ alwaysApply: true
     "npm": "./vendor/bin/sail npm"
   }
 }
+
+## 多言語化
+- laravel-langから言語ファイルを取得
+
 ```
