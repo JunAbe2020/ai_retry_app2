@@ -57,14 +57,6 @@ $delete = function () {
                 </div>
             </div>
 
-            <!-- 解決策 -->
-            <div class="mb-6">
-                <h2 class="text-lg font-semibold mb-2">解決策</h2>
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    {!! nl2br(e($mistake->my_solution)) !!}
-                </div>
-            </div>
-
             <!-- AI解決策 -->
             @if ($mistake->ai_notes)
                 <div class="mb-6">
@@ -75,15 +67,23 @@ $delete = function () {
                 </div>
             @endif
 
-            <!-- 補足 -->
-            @if ($mistake->supplement)
+            <!-- Re:AI解決策 -->
+            @if ($mistake->re_ai_notes)
                 <div class="mb-6">
-                    <h2 class="text-lg font-semibold mb-2">補足</h2>
+                    <h2 class="text-lg font-semibold mb-2">Re:AI解決策</h2>
                     <div class="bg-gray-50 p-4 rounded-lg">
-                        {!! nl2br(e($mistake->supplement)) !!}
+                        {!! nl2br(e($mistake->re_ai_notes)) !!}
                     </div>
                 </div>
             @endif
+
+            <!-- リマインド日時 -->
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold mb-2">リマインド日時</h2>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    {!! nl2br(e($mistake->reminder_date?->format('Y年m月d日 H:i'))) !!}
+                </div>
+            </div>
 
             <!-- ボタン群 -->
             <div class="mt-8 flex justify-between">

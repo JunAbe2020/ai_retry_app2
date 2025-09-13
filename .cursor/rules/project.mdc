@@ -147,6 +147,65 @@ alwaysApply: true
  -更新 → ミス更新後にミス詳細画面
  -キャンセル → ミス詳細画面
 
+## API連携
+
+### Hugging Face
+
+Hugging Face経由でモデル:meta-llama/Llama-3.3-70B-Instructを利用し、AI改善案とAI改善案を生成する。
+ただし、ボタンが2つあり、Brash up ボタンを押した場合はAI改善策を生成しmistakesテーブルのai_notesに保存。Re:Brash upボタンを押した場合はAI解決策を生成し、re_ai_notesに保存。
+
+利用するデータ
+-mistakesテーブル
+   -Brash up ボタンを押した場合。
+      -タイトル
+      -日時
+      -状況
+      -原因
+      -解決法
+
+   -Re:Brash up ボタンを押した場合。
+      -タイトル
+      -日時
+      -状況
+      -原因
+      -解決法
+      -AI改善案
+      -補足
+
+-AI改善案とAI解決法の生成条件
+ 端的に箇条書きで記載すること。
+
+### Google Calendar
+
+Google Calendar APIのサービスクラスを利用し、Google Calendarにデータの追加、更新、削除を行う。
+
+-条件
+   -Google CalendaのEventのタスクに追加
+      -ミス作成画面
+         -保存ボタンを押す →　Google Calendarへデータの登録
+      -ミス更新画面
+         -保存ボタンを押す →　Google Calendarへ登録済みのデータの更新
+      -ミス一覧画面
+         -削除ボタンを押す →　Google Caledarへ登録済みのデータを削除
+
+-利用するデータ
+   -mistakesテーブル
+      -タイトル
+      -AI改善策
+      -リマインド日時
+
+-Google Calendarへ登録、更新、削除するデータ。
+
+-条件
+   -予定ではなく、タスクに追加する
+
+-mistakesテーブルのデータの保存先
+   -タイトル → タイトルと日時を追加
+   -AI改善策 → 説明を追加
+   -リマインド日時 → 時間を追加
+
+
+
 
 
 

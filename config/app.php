@@ -123,4 +123,9 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    //'providers' => [
+    // ...
+    // 設定キャッシュ時にも読めるように config('huggingface.*') を使うだけでOK（追加のProviderは不要）
+    //],
+
 ];

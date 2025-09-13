@@ -3,24 +3,21 @@
 use function Livewire\Volt\{mount, state, action};
 use App\Models\Mistake;
 use Carbon\Carbon;
+use Illuminate\Support\Str; // ← Str::limit 用
 
-// 状態の定義
 state([
     'weeklyRetries' => [],
     'weeklyMistakes' => [],
 ]);
 
-// コンポーネントマウント時にデータを取得
 mount(function () {
     $this->loadWeeklyData();
 });
 
-// 週次データを読み込むメソッド
 $loadWeeklyData = function () {
     $startOfWeek = Carbon::now()->startOfWeek();
-    $endOfWeek = Carbon::now()->endOfWeek();
+    $endOfWeek   = Carbon::now()->endOfWeek();
 
-    // 今週のRETRYリスト（リマインド日時が今週内のミス）
     $this->weeklyRetries = Mistake::where('user_id', auth()->id())
         ->whereBetween('reminder_date', [$startOfWeek, $endOfWeek])
         ->where('is_reminded', false)
@@ -28,7 +25,6 @@ $loadWeeklyData = function () {
         ->orderBy('reminder_date')
         ->get();
 
-    // 今週のミスリスト（今週発生したミス）
     $this->weeklyMistakes = Mistake::where('user_id', auth()->id())
         ->whereBetween('happened_at', [$startOfWeek, $endOfWeek])
         ->with('tags')
@@ -36,7 +32,6 @@ $loadWeeklyData = function () {
         ->get();
 };
 
-// 完了マークを付けるメソッド
 $markAsCompleted = action(function ($mistakeId) {
     $mistake = Mistake::where('id', $mistakeId)
         ->where('user_id', auth()->id())
@@ -44,11 +39,7 @@ $markAsCompleted = action(function ($mistakeId) {
 
     if ($mistake) {
         $mistake->update(['is_reminded' => true]);
-
-        // データを再読み込み
         $this->loadWeeklyData();
-
-        // 成功メッセージを表示
         session()->flash('message', 'RETRYを完了としてマークしました。');
     }
 });
@@ -57,7 +48,6 @@ $markAsCompleted = action(function ($mistakeId) {
 
 <div class="min-h-screen bg-gray-50 py-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <!-- ヘッダー -->
         <div class="text-center mb-12">
             <h1 class="text-6xl font-bold text-gray-900 mb-4">RETRY</h1>
             <p class="text-2xl text-gray-600">It's okay to mess up!!</p>
@@ -69,8 +59,7 @@ $markAsCompleted = action(function ($mistakeId) {
                 <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                     <svg class="w-6 h-6 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4">
-                        </path>
+                            d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                     </svg>
                     今週のRETRYリスト
                 </h2>
@@ -78,8 +67,14 @@ $markAsCompleted = action(function ($mistakeId) {
                 @if ($this->weeklyRetries->count() > 0)
                     <div class="space-y-4">
                         @foreach ($this->weeklyRetries as $retry)
-                            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                                <div class="flex items-start justify-between">
+                            <div class="relative border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                                <!-- クリック用オーバーレイ（最前面） -->
+                                <a href="{{ route('retries.show', $retry) }}"
+                                    class="absolute inset-0 z-20"
+                                    wire:navigate
+                                    aria-label="詳細へ"></a>
+
+                                <div class="flex items-start justify-between relative z-10 pointer-events-none">
                                     <div class="flex-1">
                                         <h3 class="font-semibold text-gray-900 mb-2">{{ $retry->title }}</h3>
                                         <p class="text-sm text-gray-600 mb-2">
@@ -87,8 +82,7 @@ $markAsCompleted = action(function ($mistakeId) {
                                             {{ $retry->reminder_date?->format('Y年m月d日 H:i') }}
                                         </p>
                                         @if ($retry->re_ai_notes)
-                                            <p
-                                                class="text-sm text-gray-700 bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+                                            <p class="text-sm text-gray-700 bg-blue-50 p-3 rounded border-l-4 border-blue-400">
                                                 <span class="font-medium">AI解決策:</span>
                                                 {{ Str::limit($retry->re_ai_notes, 100) }}
                                             </p>
@@ -96,18 +90,19 @@ $markAsCompleted = action(function ($mistakeId) {
                                         @if ($retry->tags->count() > 0)
                                             <div class="flex flex-wrap gap-1 mt-2">
                                                 @foreach ($retry->tags as $tag)
-                                                    <span
-                                                        class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                                                    <span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
                                                         {{ $tag->name }}
                                                     </span>
                                                 @endforeach
                                             </div>
                                         @endif
                                     </div>
-                                    <div class="ml-4">
+
+                                    <!-- チェックボックスはリンクより前面 & クリック可 -->
+                                    <div class="ml-4 relative z-30 pointer-events-auto">
                                         <input type="checkbox"
-                                            class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                                            wire:click="markAsCompleted({{ $retry->id }})">
+                                                class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                                wire:click.stop="markAsCompleted({{ $retry->id }})">
                                     </div>
                                 </div>
                             </div>
@@ -115,11 +110,9 @@ $markAsCompleted = action(function ($mistakeId) {
                     </div>
                 @else
                     <div class="text-center py-8 text-gray-500">
-                        <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4">
-                            </path>
+                                    d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                         </svg>
                         <p>今週のRETRYリストはありません</p>
                     </div>
@@ -131,8 +124,7 @@ $markAsCompleted = action(function ($mistakeId) {
                 <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                     <svg class="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z">
-                        </path>
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
                     今週のミスリスト
                 </h2>
@@ -140,16 +132,21 @@ $markAsCompleted = action(function ($mistakeId) {
                 @if ($this->weeklyMistakes->count() > 0)
                     <div class="space-y-4">
                         @foreach ($this->weeklyMistakes as $mistake)
-                            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                                <div class="flex-1">
+                            <div class="relative border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                                <!-- クリック用オーバーレイ（最前面） -->
+                                <a href="{{ route('retries.show', $mistake) }}"
+                                    class="absolute inset-0 z-20"
+                                    wire:navigate
+                                    aria-label="詳細へ"></a>
+
+                                <div class="flex-1 relative z-10 pointer-events-none">
                                     <h3 class="font-semibold text-gray-900 mb-2">{{ $mistake->title }}</h3>
                                     <p class="text-sm text-gray-600 mb-2">
                                         <span class="font-medium">発生日時:</span>
                                         {{ $mistake->happened_at->format('Y年m月d日 H:i') }}
                                     </p>
                                     @if ($mistake->ai_notes)
-                                        <p
-                                            class="text-sm text-gray-700 bg-green-50 p-3 rounded border-l-4 border-green-400">
+                                        <p class="text-sm text-gray-700 bg-green-50 p-3 rounded border-l-4 border-green-400">
                                             <span class="font-medium">AI改善案:</span>
                                             {{ Str::limit($mistake->ai_notes, 100) }}
                                         </p>
@@ -157,8 +154,7 @@ $markAsCompleted = action(function ($mistakeId) {
                                     @if ($mistake->tags->count() > 0)
                                         <div class="flex flex-wrap gap-1 mt-2">
                                             @foreach ($mistake->tags as $tag)
-                                                <span
-                                                    class="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                                                <span class="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
                                                     {{ $tag->name }}
                                                 </span>
                                             @endforeach
@@ -170,17 +166,14 @@ $markAsCompleted = action(function ($mistakeId) {
                     </div>
                 @else
                     <div class="text-center py-8 text-gray-500">
-                        <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z">
-                            </path>
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                         </svg>
                         <p>今週のミスはありません</p>
                     </div>
                 @endif
             </div>
         </div>
-
     </div>
 </div>
