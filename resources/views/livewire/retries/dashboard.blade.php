@@ -67,14 +67,11 @@ $markAsCompleted = action(function ($mistakeId) {
                 @if ($this->weeklyRetries->count() > 0)
                     <div class="space-y-4">
                         @foreach ($this->weeklyRetries as $retry)
-                            <div class="relative border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                                <!-- クリック用オーバーレイ（最前面） -->
-                                <a href="{{ route('retries.show', $retry) }}"
-                                    class="absolute inset-0 z-20"
-                                    wire:navigate
-                                    aria-label="詳細へ"></a>
+                            <div class="relative border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                                onclick="if (!event.target.closest('[data-interactive]')) { window.location.href='{{ route('retries.show', $retry) }}' }"
+                                data-interactive>
 
-                                <div class="flex items-start justify-between relative z-10 pointer-events-none">
+                                <div class="flex items-start justify-between">
                                     <div class="flex-1">
                                         <h3 class="font-semibold text-gray-900 mb-2">{{ $retry->title }}</h3>
                                         <p class="text-sm text-gray-600 mb-2">
@@ -98,11 +95,12 @@ $markAsCompleted = action(function ($mistakeId) {
                                         @endif
                                     </div>
 
-                                    <!-- チェックボックスはリンクより前面 & クリック可 -->
-                                    <div class="ml-4 relative z-30 pointer-events-auto">
+                                    <!-- ここを「インタラクティブ扱い」にして遷移抑止 -->
+                                    <div class="ml-4" data-interactive>
                                         <input type="checkbox"
-                                                class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                                                wire:click.stop="markAsCompleted({{ $retry->id }})">
+                                            class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                            onclick="event.stopPropagation();"  {{-- 親のonclickを止める --}}
+                                            wire:click="markAsCompleted({{ $retry->id }})">
                                     </div>
                                 </div>
                             </div>
