@@ -3,9 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
-// Route::get('/', function () {
-//     return view('welcome');
-// })->name('home');
+// 認証されていないユーザー向けのルート
+Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect()->route('retries.dashboard');
+    }
+    return view('welcome');
+})->name('home');
 
 Route::view('dashboard', 'dashboard')
     ->middleware(['auth', 'verified'])
@@ -18,8 +22,8 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('settings/password', 'settings.password')->name('settings.password');
     Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
 
-    // ダッシュボード画面
-    Volt::route('/', 'retries.dashboard')->name('retries.dashboard');
+    // ダッシュボード画面（認証済みユーザー向け）
+    Volt::route('retries/dashboard', 'retries.dashboard')->name('retries.dashboard');
 
     // ミス一覧画面
     Volt::route('retries/index', 'retries.index')->name('retries.index');
