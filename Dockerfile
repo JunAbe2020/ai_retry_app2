@@ -1,6 +1,8 @@
 # richarvey/nginx-php-fpmをベースとする
 FROM richarvey/nginx-php-fpm:latest 
 
+RUN apk add --no-cache nodejs npm
+
 COPY . .
 
 # Image config
