@@ -19,13 +19,20 @@ class GoogleCalendarService
 
     public function __construct()
     {
-        $json = config('google.service_account_json');
-        if (! is_string($json) || $json === '' || ! file_exists($json)) {
-            throw new \RuntimeException('Google service account JSON not found: '.(string)$json);
+        $jsonString = config('google.service_account_json');
+
+        if (empty($jsonString)) {
+            throw new \RuntimeException('Google service account JSON not configured');
+        }
+
+        // JSON文字列を配列に変換
+        $jsonArray = json_decode($jsonString, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \RuntimeException('Invalid Google service account JSON: ' . json_last_error_msg());
         }
 
         $this->client = new Client();
-        $this->client->setAuthConfig($json);
+        $this->client->setAuthConfig($jsonArray);
         $this->client->setScopes([GoogleCalendar::CALENDAR]); // 読み書き
         // 偽装はしない（個人Gmailでは不可）
         $this->calendar = new GoogleCalendar($this->client);
@@ -77,11 +84,11 @@ class GoogleCalendarService
             (string) $m->ai_notes,
             '',
             '---',
-            'Mistake ID: '.$m->id,
-            '発生日時: '.$m->happened_at,
-            '状況: '.Str::limit((string) $m->situation, 300),
-            '原因: '.Str::limit((string) $m->cause, 300),
-            '解決策: '.Str::limit((string) $m->my_solution, 300),
+            'Mistake ID: ' . $m->id,
+            '発生日時: ' . $m->happened_at,
+            '状況: ' . Str::limit((string) $m->situation, 300),
+            '原因: ' . Str::limit((string) $m->cause, 300),
+            '解決策: ' . Str::limit((string) $m->my_solution, 300),
         ])));
 
         $event = new GoogleEvent([
@@ -183,6 +190,4 @@ class GoogleCalendarService
             'nextSyncToken' => $nextSyncToken ?? null,
         ];
     }
-
-    
 }
